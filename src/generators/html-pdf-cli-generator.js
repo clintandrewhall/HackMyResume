@@ -93,12 +93,11 @@ var engines = {
         local: true,
       });
       if (installed) {
-        pathToBin = PATH.join(__dirname, 'node_modules', pathToBin);
+        pathToBin = PATH.join(process.cwd(), 'node_modules', pathToBin);
       }
     } catch (e) {
       return false;
     }
-
 
     SPAWN(pathToBin, wkargs , false, on_error, this);
   },
@@ -120,7 +119,25 @@ var engines = {
     scriptPath = SLASH(scriptPath);
     const sourcePath = SLASH(PATH.relative( process.cwd(), tempFile));
     const destPath = SLASH(PATH.relative( process.cwd(), fOut));
-    SPAWN('phantomjs', [ scriptPath, sourcePath, destPath ], false, on_error, this);
+
+    let pathToBin = 'phantomjs';
+
+    // If the executable was installed in the node_modules directory of a
+    // project, and that project includes wkhtmltopdf, use that instance
+    // instead.
+    try {
+      const installed = detectInstalled.sync('phantomjs-prebuilt', {
+        cwd: process.cwd(),
+        local: true,
+      });
+      if (installed) {
+        pathToBin = PATH.join(process.cwd(), 'node_modules', '.bin', 'phantomjs');
+      }
+    } catch (e) {
+      return false;
+    }
+
+    SPAWN(pathToBin, [ scriptPath, sourcePath, destPath ], false, on_error, this);
   },
 
   /**
