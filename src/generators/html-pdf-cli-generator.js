@@ -9,8 +9,6 @@ Definition of the HtmlPdfCLIGenerator class.
 @license MIT. See LICENSE.md for details.
 */
 
-
-
 const TemplateGenerator = require('./template-generator');
 const FS = require('fs-extra');
 const PATH = require('path');
@@ -20,7 +18,6 @@ const detectInstalled = require('get-installed-path');
 const HMSTATUS = require('../core/status-codes');
 const SPAWN = require('../utils/safe-spawn');
 
-
 /**
 An HTML-driven PDF resume generator for HackMyResume. Talks to Phantom,
 wkhtmltopdf, and other PDF engines over a CLI (command-line interface).
@@ -28,34 +25,41 @@ If an engine isn't installed for a particular platform, error out gracefully.
 */
 
 class HtmlPdfCLIGenerator extends TemplateGenerator {
-
-
-
-  constructor() { super('pdf', 'html'); }
-
-
+  constructor() {
+    super('pdf', 'html');
+  }
 
   /** Generate the binary PDF. */
-  onBeforeSave( info ) {
+  onBeforeSave(info) {
     //console.dir _.omit( info, 'mk' ), depth: null, colors: true
-    if ((info.ext !== 'html') && (info.ext !== 'pdf')) { return info.mk; }
+    if (info.ext !== 'html' && info.ext !== 'pdf') {
+      return info.mk;
+    }
     let safe_eng = info.opts.pdf || 'wkhtmltopdf';
-    if (safe_eng === 'phantom') { safe_eng = 'phantomjs'; }
+    if (safe_eng === 'phantom') {
+      safe_eng = 'phantomjs';
+    }
     if (_.has(engines, safe_eng)) {
       this.errHandler = info.opts.errHandler;
-      engines[ safe_eng ].call(this, info.mk, info.outputFile, info.opts, this.onError);
+      engines[safe_eng].call(
+        this,
+        info.mk,
+        info.outputFile,
+        info.opts,
+        this.onError
+      );
       return null; // halt further processing
     }
   }
-
-
 
   /* Low-level error callback for spawn(). May be called after HMR process
   termination, so object references may not be valid here. That's okay; if
   the references are invalid, the error was already logged. We could use
   spawn-watch here but that causes issues on legacy Node.js. */
   onError(ex, param) {
-    __guardMethod__(param.errHandler, 'err', o => o.err(HMSTATUS.pdfGeneration, ex));
+    __guardMethod__(param.errHandler, 'err', o =>
+      o.err(HMSTATUS.pdfGeneration, ex)
+    );
   }
 }
 
@@ -63,9 +67,6 @@ module.exports = HtmlPdfCLIGenerator;
 
 // TODO: Move each engine to a separate module
 var engines = {
-
-
-
   /**
   Generate a PDF from HTML using wkhtmltopdf's CLI interface.
   Spawns a child process with `wkhtmltopdf <source> <target>`. wkhtmltopdf
@@ -79,30 +80,15 @@ var engines = {
     FS.writeFileSync(tempFile, markup, 'utf8');
 
     // Prepare wkhtmltopdf arguments.
-    let wkopts = _.extend({'margin-top': '10mm', 'margin-bottom': '10mm'}, opts.wkhtmltopdf);
+    let wkopts = _.extend(
+      { 'margin-top': '10mm', 'margin-bottom': '10mm' },
+      opts.wkhtmltopdf
+    );
     wkopts = _.flatten(_.map(wkopts, (v, k) => [`--${k}`, v]));
-    const wkargs = wkopts.concat([ tempFile, fOut  ]);
-    let pathToBin = 'wkhtmltopdf';
+    const wkargs = wkopts.concat([tempFile, fOut]);
 
-    // If the executable was installed in the node_modules directory of a
-    // project, and that project includes wkhtmltopdf, use that instance
-    // instead.
-    try {
-      const installed = detectInstalled.sync(pathToBin, {
-        cwd: process.cwd(),
-        local: true,
-      });
-      if (installed) {
-        pathToBin = PATH.join(process.cwd(), 'node_modules', pathToBin);
-      }
-    } catch (e) {
-      return false;
-    }
-
-    SPAWN(pathToBin, wkargs , false, on_error, this);
+    SPAWN('/app/bin/wkhtmltopdf', wkargs, false, on_error, this);
   },
-
-
 
   /**
   Generate a PDF from HTML using Phantom's CLI interface.
@@ -111,14 +97,17 @@ var engines = {
   TODO: If HTML generation has run, reuse that output
   TODO: Local web server to ease Phantom rendering
   */
-  phantomjs( markup, fOut, opts, on_error ) {
+  phantomjs(markup, fOut, opts, on_error) {
     // Save the markup to a temporary file
     const tempFile = fOut.replace(/\.pdf$/i, '.pdf.html');
     FS.writeFileSync(tempFile, markup, 'utf8');
-    let scriptPath = PATH.relative(process.cwd(), PATH.resolve( __dirname, '../utils/rasterize.js' ));
+    let scriptPath = PATH.relative(
+      process.cwd(),
+      PATH.resolve(__dirname, '../utils/rasterize.js')
+    );
     scriptPath = SLASH(scriptPath);
-    const sourcePath = SLASH(PATH.relative( process.cwd(), tempFile));
-    const destPath = SLASH(PATH.relative( process.cwd(), fOut));
+    const sourcePath = SLASH(PATH.relative(process.cwd(), tempFile));
+    const destPath = SLASH(PATH.relative(process.cwd(), fOut));
 
     let pathToBin = 'phantomjs';
 
@@ -128,16 +117,21 @@ var engines = {
     try {
       const installed = detectInstalled.sync('phantomjs-prebuilt', {
         cwd: process.cwd(),
-        local: true,
+        local: true
       });
       if (installed) {
-        pathToBin = PATH.join(process.cwd(), 'node_modules', '.bin', 'phantomjs');
+        pathToBin = PATH.join(
+          process.cwd(),
+          'node_modules',
+          '.bin',
+          'phantomjs'
+        );
       }
     } catch (e) {
       return false;
     }
 
-    SPAWN(pathToBin, [ scriptPath, sourcePath, destPath ], false, on_error, this);
+    SPAWN(pathToBin, [scriptPath, sourcePath, destPath], false, on_error, this);
   },
 
   /**
@@ -146,7 +140,7 @@ var engines = {
   must be installed and path-accessible.
   TODO: If HTML generation has run, reuse that output
   */
-  weasyprint( markup, fOut, opts, on_error ) {
+  weasyprint(markup, fOut, opts, on_error) {
     // Save the markup to a temporary file
     const tempFile = fOut.replace(/\.pdf$/i, '.pdf.html');
     FS.writeFileSync(tempFile, markup, 'utf8');
@@ -156,7 +150,11 @@ var engines = {
 };
 
 function __guardMethod__(obj, methodName, transform) {
-  if (typeof obj !== 'undefined' && obj !== null && typeof obj[methodName] === 'function') {
+  if (
+    typeof obj !== 'undefined' &&
+    obj !== null &&
+    typeof obj[methodName] === 'function'
+  ) {
     return transform(obj, methodName);
   } else {
     return undefined;
